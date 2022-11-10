@@ -6,6 +6,9 @@
     <modules>
         <module>Gateway</module>
         <module>UserService</module>
+        <module>liveroomservice</module>
+        <module>storageservice</module>
+        <module>interactionservice</module>
     </modules>
     <parent>
         <groupId>org.springframework.boot</groupId>
