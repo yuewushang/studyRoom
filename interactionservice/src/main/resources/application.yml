@@ -5,7 +5,7 @@ spring:
     name: interactionservice
   cloud:
     nacos:
-      server-addr: 175.178.85.36:8848 #服务发现地址
+      server-addr: localhost:8848 #服务发现地址
   datasource:
     druid:
       driver-class-name: com.mysql.cj.jdbc.Driver

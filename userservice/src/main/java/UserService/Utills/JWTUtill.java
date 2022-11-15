@@ -23,8 +23,8 @@ public class JWTUtill {
     public static String getToken(Long userId){
         //创建一个日历对象，获取时间
         Calendar calendar=Calendar.getInstance();
-        //把该时间值设置在2小时之后
-        calendar.add(Calendar.SECOND,60*60*2);
+        //把该时间值设置在7天之后
+        calendar.add(Calendar.SECOND,60*60*24*7);
         //生成token
         String token= JWT.create()
                 .withClaim("userId",userId) //设置用户名负载

@@ -5,7 +5,7 @@ spring:
     name: gateway #网关服务的名称
   cloud:
     nacos:
-      server-addr: 175.178.85.36:8848 #配置nacos服务地址
+      server-addr: localhost:8848 #配置nacos服务地址
     gateway:
       routes: #配置路由
         - id: user-service #路由的唯一id
@@ -15,7 +15,7 @@ spring:
         - id: liveroom-service
           uri: lb://liveroomservice
           predicates:
-            - Path=/liveRoom/**
+            - Path=/liveRoom/**,/studyRoom/**
         - id: storage-service #存储服务，该路由的唯一id
           uri: lb://storageservice #lb使用负载均衡,后跟应用名
           predicates:
