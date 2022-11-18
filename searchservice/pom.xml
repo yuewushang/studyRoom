@@ -9,35 +9,31 @@
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
-    <artifactId>liveroomservice</artifactId>
+    <artifactId>searchservice</artifactId>
+    <properties>
+<!--        springboot有默认的es版本，我们要替换成我们要用的7.12.1版本-->
+        <elasticsearch.version>7.12.1</elasticsearch.version>
+    </properties>
 
     <dependencies>
-<!--        引入spring-web-->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
-<!--        引入nacos发现依赖-->
+<!--        导入nacos发现依赖-->
         <dependency>
             <groupId>com.alibaba.cloud</groupId>
             <artifactId>spring-cloud-starter-alibaba-nacos-discovery</artifactId>
             <version>2.2.5.RELEASE</version>
         </dependency>
-<!--        引入feign-->
+<!--        引入elasticSearch-->
         <dependency>
-            <groupId>org.springframework.cloud</groupId>
-            <artifactId>spring-cloud-starter-openfeign</artifactId>
-            <version>2.2.7.RELEASE</version>
+            <groupId>org.elasticsearch.client</groupId>
+            <artifactId>elasticsearch-rest-high-level-client</artifactId>
         </dependency>
-<!--        引入httpclient作feign的连接池-->
-        <dependency>
-            <groupId>io.github.openfeign</groupId>
-            <artifactId>feign-httpclient</artifactId>
-            <version>10.10.1</version>
-        </dependency>
-        
-    </dependencies>
 
+
+    </dependencies>
 
     <build>
         <plugins>

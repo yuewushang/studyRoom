@@ -1,40 +1,39 @@
 package InteractionService.Controller;
 
-import InteractionService.Common.R;
+
 import InteractionService.Domain.Message;
 import InteractionService.Service.MessageService;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import lombok.extern.slf4j.Slf4j;
-import lombok.val;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
-import org.springframework.web.bind.annotation.RestController;
+
 
 import javax.websocket.*;
 import javax.websocket.server.PathParam;
 import javax.websocket.server.ServerEndpoint;
 import java.io.IOException;
 import java.time.LocalDateTime;
-import java.util.Enumeration;
+
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
+
 
 //webscoket服务器
 @Component
 @Slf4j
 @ServerEndpoint("/interaction/websocket/{userInformation}")
 public class WebsocketService {
-    //当前在线人数
-    public static int onLineNumber;
+    public static Map<String,Integer>studyRoomOnlineNumber=new HashMap<>();//各个自习室的在线人数
     //创建一个哈希表来存放每个用户对应的websocketService
     //使用concurentHashMap来解决高并发的读写冲突问题
     public static ConcurrentHashMap<String,WebsocketService> websocketServiceConcurrentHashMap=new ConcurrentHashMap<>();
     public String userInformation;//接收到的直播间房间号+弹幕发送者的姓名
     public Session session;//当前会话
+    public String studyRoomId;//自习室的id
     private static MessageService messageService;
     //因为websocket多对象和spring注入单例冲突，所以写一个方法来注入之
     @Autowired
@@ -48,16 +47,28 @@ public class WebsocketService {
      * @param session
      */
     @OnOpen
-    public void onOpen(@PathParam("userInformation") String userInformation, Session session){
+    public void onOpen(@PathParam("userInformation") String userInformation, Session session) throws IOException {
         this.session=session;
         this.userInformation=userInformation;
+        //获取自习室的studyRoomId
+        studyRoomId = this.userInformation.substring(0, 19);
         //如果原来没有，则在线人数增加
         if(!websocketServiceConcurrentHashMap.containsKey(userInformation)){
-            addOnlineNumber();
+            this.addOnlineNumber(studyRoomId);
         }
         websocketServiceConcurrentHashMap.put(userInformation,this);
+        //向该房间中的所有人发送消息
+        Iterator<Map.Entry<String, WebsocketService>> iterator = websocketServiceConcurrentHashMap.entrySet().iterator();
+        while (iterator.hasNext()){
+            Map.Entry<String, WebsocketService> next = iterator.next();
+            String key = next.getKey();
+            //如果是同一个直播间中的信息
+            if(userInformation.substring(0,19).equals(key.substring(0,19))){
+                next.getValue().sendMessage(JSON.toJSONString("当前在线人数为"+this.getOnlineNumber(studyRoomId)));
+            }
+        }
 
-        log.info("用户"+userInformation+"连接"+"当前在线人数为"+getOnlineNumber());
+        log.info("用户"+userInformation+"连接"+"当前在线人数为"+this.getOnlineNumber(studyRoomId));
     }
 
     /**
@@ -67,11 +78,10 @@ public class WebsocketService {
     @OnClose
     public void onClose(){
         if(websocketServiceConcurrentHashMap.containsKey(userInformation)){
-            websocketServiceConcurrentHashMap.remove(this);
             websocketServiceConcurrentHashMap.remove(userInformation);
-            subOnlineNumber();
+            this.subOnlineNumber(studyRoomId);
         }
-        log.info("用户"+userInformation+"退出，当前在线人数为"+getOnlineNumber());
+        log.info("用户"+userInformation+"退出，当前在线人数为"+this.getOnlineNumber(studyRoomId));
     }
 
     /**
@@ -84,6 +94,7 @@ public class WebsocketService {
         log.info("用户"+userInformation+"发送弹幕："+message);
         JSONObject object = JSON.parseObject(message);
         String userName=object.get("userInformation").toString().substring(19);
+        String studyRoomId2=object.get("userInformation").toString().substring(0,19);
         String messageToSend=object.getString("messageToSend");
         //获取当前时间
         LocalDateTime time=LocalDateTime.now();
@@ -135,23 +146,39 @@ public class WebsocketService {
     /**
      * 增加在线人数，synchronized解决并发同步问题
      */
-    public static synchronized void addOnlineNumber(){
-        onLineNumber++;
+    public synchronized void addOnlineNumber(String studyRoomId){
+        //判断是否存在
+        boolean b = this.studyRoomOnlineNumber.containsKey(studyRoomId);
+        //如果不存在，放进去
+        if(!b){
+            this.studyRoomOnlineNumber.put(studyRoomId,1);
+        }
+        //如果已经存在
+        else {
+            //在线人数加1
+            this.studyRoomOnlineNumber.put(studyRoomId,this.studyRoomOnlineNumber.get(studyRoomId)+1);
+        }
     }
 
     /**
      * 减少在线人数，synchronized解决并发同步问题
      */
-    public static synchronized void subOnlineNumber(){
-        onLineNumber--;
+    public  synchronized void subOnlineNumber(String studyRoomId){
+        //判断是否存在
+        boolean b = this.studyRoomOnlineNumber.containsKey(studyRoomId);
+        //如果存在，使在线人数减1
+        if(b){
+            this.studyRoomOnlineNumber.put(studyRoomId,this.studyRoomOnlineNumber.get(studyRoomId)-1);
+        }
     }
 
     /**
      * 获取在线人数，synchronized解决并发同步问题
      * @return
      */
-    public static synchronized Integer getOnlineNumber(){
-        return onLineNumber;
+    public  synchronized Integer getOnlineNumber(String studyRoomId){
+        //获取该自习室的在线人数
+        return this.studyRoomOnlineNumber.get(studyRoomId);
     }
 
 

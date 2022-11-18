@@ -9,6 +9,7 @@
         <module>liveroomservice</module>
         <module>storageservice</module>
         <module>interactionservice</module>
+        <module>searchservice</module>
     </modules>
     <parent>
         <groupId>org.springframework.boot</groupId>

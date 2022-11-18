@@ -1,10 +1,10 @@
 package liveroomservice.Controller;
 
+import com.alibaba.fastjson.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import liveroomservice.Client.UserClient;
 import liveroomservice.Common.R;
-import liveroomservice.Domain.StudyRoom;
-import liveroomservice.Domain.StudyRoomMember;
-import liveroomservice.Domain.StudyRoomPlan;
+import liveroomservice.Domain.*;
 import liveroomservice.Dto.EnterStudyRoomVerify;
 import liveroomservice.Dto.ShareStudyRoom;
 import liveroomservice.Service.StudyRoomMemberService;
@@ -32,6 +32,9 @@ public class StudyRoomController {
 
     @Autowired
     private StudyRoomMemberService studyRoomMemberService;
+
+    @Autowired
+    private UserClient userClient;
 
     /**
      * 创建自习室
@@ -330,6 +333,7 @@ public class StudyRoomController {
         LambdaQueryWrapper<StudyRoomMember> wrapper=new LambdaQueryWrapper<>();
         wrapper.eq(l!=null,StudyRoomMember::getStudyRoomId,l);
         wrapper.eq(StudyRoomMember::getIsOnline,1);
+        wrapper.orderByDesc(StudyRoomMember::getLengthOfStudy);
         List<StudyRoomMember> list = studyRoomMemberService.list(wrapper);
         return R.success(list);
     }
@@ -376,6 +380,75 @@ public class StudyRoomController {
     }
 
 
+    @GetMapping("/getDeskMate")
+    public R<List<String>> getDeskMate(String studyRoomId,String userId){
+        //获取在线成员
+        Long l = Long.parseLong(studyRoomId);
+        //获取其成员信息
+        LambdaQueryWrapper<StudyRoomMember> wrapper=new LambdaQueryWrapper<>();
+        wrapper.eq(l!=null,StudyRoomMember::getStudyRoomId,l);
+        wrapper.eq(StudyRoomMember::getIsOnline,1);
+        wrapper.orderByDesc(StudyRoomMember::getLengthOfStudy);
+        List<StudyRoomMember> list = studyRoomMemberService.list(wrapper);
+        //记录符合条件的用户id
+        List<Long>userIdList=new ArrayList<>();
+        //如果在线的成员数少于4人，
+        if(list.size()<=4){
+            //调用userService服务，获取这几个人的拉流地址
+            //获取用户id
+            for(int i=0;i<list.size();i++){
+                userIdList.add(list.get(i).getUserId());
+            }
+            //发送服务调用请求
+            List<String> fourDeskMate = userClient.getFourDeskMate(userIdList);
+            return R.success(fourDeskMate);
+
+        }
+        int location=0;//用户所在位置
+        //获取该用户所在的位置
+        for(int i=0;i<list.size();i++){
+            //如果找到了，记录下来
+            if(list.get(i).getUserId().equals(Long.parseLong(userId))){
+                location=i;
+                break;
+            }
+        }
+        //如果位置等于4.则返回前四名
+        if(location==4){
+            //返回前四名的拉流地址
+            for(int i=0;i<4;i++){
+                userIdList.add(list.get(i).getUserId());
+            }
+            //发送服务调用
+            List<String> fourDeskMate = userClient.getFourDeskMate(userIdList);
+            return R.success(fourDeskMate);
+        }
+        //如果位置小于4，则要借用后面的
+        if(location<4&&list.size()>=4){
+            for(int i=0;i<4;i++){
+                userIdList.add(list.get(i).getUserId());
+            }
+            //发送服务调用
+            List<String> fourDeskMate = userClient.getFourDeskMate(userIdList);
+            return R.success(fourDeskMate);
+        }
+        if(location<4&&list.size()<4){
+            for(int i=0;i<list.size();i++){
+                userIdList.add(list.get(i).getUserId());
+            }
+            //发送服务调用
+            List<String> fourDeskMate = userClient.getFourDeskMate(userIdList);
+            return R.success(fourDeskMate);
+        }
+        //如果一切正常，则返回前三人和自己的拉流地址
+        for(int i=location;i>=0;i--){
+            userIdList.add(list.get(i).getUserId());
+        }
+        //发送服务调用
+        List<String> fourDeskMate = userClient.getFourDeskMate(userIdList);
+        return R.success(fourDeskMate);
+
+    }
 
 
 

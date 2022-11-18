@@ -18,6 +18,8 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -192,5 +194,22 @@ public class LoginController {
         wrapper.eq(userName != null, User::getUserName, userName);
         User one = userService.getOne(wrapper);
         return R.success(String.valueOf(one.getUserId()));
+    }
+
+    /**
+     * 提供给liveroom服务调用，获取四个同桌的拉流地址
+     * @param userList
+     * @return
+     */
+    @PostMapping("/getFourDeskMate")
+    public List<String>getFourDeskMate(@RequestBody List<Long> userList){
+        List<String>list=new ArrayList<>();
+        for(int i=0;i<userList.size();i++){
+            User byId = userService.getById(userList.get(i));
+            String streamWord = byId.getStreamWord();
+            String pullUrl = "http://175.178.85.36:8080/live/" + byId.getUserId() + "/" + streamWord + ".flv";
+            list.add(pullUrl);
+        }
+        return list;
     }
 }

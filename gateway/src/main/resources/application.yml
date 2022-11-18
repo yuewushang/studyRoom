@@ -24,6 +24,10 @@ spring:
           uri: lb://interactionservice #负载均衡，从nacos那里获取服务
           predicates:
             - Path=/interaction/** #根据该路径去匹配该路由
+        - id: search-service #搜素服务
+          uri: lb://searchservice #负载均衡，从nacos那里拉取服务
+          predicates:
+            - Path=/search/** #路径匹配
       globalcors:  #解决跨域问题
         add-to-simple-url-handler-mapping: true   #允许浏览器的options访问行为
         cors-configurations:

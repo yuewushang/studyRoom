@@ -33,3 +33,10 @@ mybatis-plus:
   configuration:
     map-underscore-to-camel-case: true  #驼峰映射下划线
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl  #控制台打印sql信息
+
+#使用httpclient用来做为feign的连接池
+feign:
+  httpclient:
+    max-connections-per-route: 50
+    max-connections: 200
+    enabled: true
