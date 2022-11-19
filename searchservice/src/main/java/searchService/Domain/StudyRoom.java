@@ -30,9 +30,4 @@ public class StudyRoom {
     //逻辑删除字段
     @TableLogic
     private Integer isDelete;
-    //自动填充字段
-    @TableField(fill = FieldFill.INSERT)
-    private LocalDateTime createTime;//自习室创建时间
-    @TableField(fill = FieldFill.INSERT_UPDATE)
-    private LocalDateTime updateTime;//自习室更新时间
 }

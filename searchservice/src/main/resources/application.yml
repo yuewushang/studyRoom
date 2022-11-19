@@ -24,6 +24,13 @@ spring:
     database: 0
     host: 175.178.85.36
     port: 6379
+  #配置rabbitmq
+  rabbitmq:
+    username: yue
+    password: yue
+    addresses: 121.37.24.27
+    port: 5672
+    virtual-host: / #虚拟主机
 #配置mybatis-plus
 mybatis-plus:
   global-config:
@@ -34,3 +41,8 @@ mybatis-plus:
   configuration:
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl #控制台输入mysql语句
     map-underscore-to-camel-case: true #驼峰和下划线映射
+feign:
+  httpclient:
+    enabled: true
+    max-connections: 200
+    max-connections-per-route: 50

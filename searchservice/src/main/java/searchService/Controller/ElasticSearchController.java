@@ -21,11 +21,15 @@ import org.elasticsearch.search.suggest.Suggest;
 import org.elasticsearch.search.suggest.SuggestBuilder;
 import org.elasticsearch.search.suggest.SuggestBuilders;
 import org.elasticsearch.search.suggest.completion.CompletionSuggestion;
+import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
+import searchService.Client.StudyRoomClient;
+import searchService.Client.UserClient;
 import searchService.Common.R;
 import searchService.Domain.StudyRoom;
 import searchService.Domain.User;
-import searchService.Dto.UserDto;
+
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -36,6 +40,10 @@ import java.util.List;
 @RequestMapping("/search")
 @Slf4j
 public class ElasticSearchController {
+    @Autowired
+    private UserClient userClient;
+    @Autowired
+    private StudyRoomClient studyRoomClient;
 
     //创建一个restHighLevelClient来操作elasticSearch
     public RestHighLevelClient createRestHighLevelClient(){
@@ -213,6 +221,21 @@ public class ElasticSearchController {
 
     }
 
+    /**
+     * 删除自习室信息
+     * @param studyRoomId
+     */
+    public void deleteStudyRoomFromElasticSearch(String studyRoomId) throws IOException {
+        RestHighLevelClient restHighLevelClient = createRestHighLevelClient();
+        //创建请求
+        DeleteRequest deleteRequest=new DeleteRequest("study_room",studyRoomId);
+        //发送请求
+        restHighLevelClient.delete(deleteRequest,RequestOptions.DEFAULT);
+        //关闭客户端
+        restHighLevelClient.close();
+
+    }
+
 
     /**
      * 更新elasticSearch中的studyRoom数据
@@ -280,6 +303,7 @@ public class ElasticSearchController {
             StudyRoom studyRoom = JSON.parseObject(sourceAsString, StudyRoom.class);
             list.add(studyRoom);
         }
+        restHighLevelClient.close();
         return R.success(list);
     }
 
@@ -319,6 +343,49 @@ public class ElasticSearchController {
         return R.success(list);
     }
 
+    /**
+     * 监听addUser队列的消息
+     * @param userId
+     */
+    @RabbitListener(queues = "addUser")
+    public void addUserListener(String userId) throws IOException {
+        log.info("接收到的消息为"+userId);
+        //根据id查询用户信息
+        User userMessageById = userClient.getUserMessageById(userId);
+        //添加到elasticSearch中
+        addUserToElasticSearch(userMessageById);
+    }
+
+    /**
+     * 监听addStudyRoom队列的消息
+     * @param studyRoomId
+     */
+    @RabbitListener(queues = "addStudyRoom")
+    public void addStudyRoom(String studyRoomId) throws IOException {
+        //去查询该自习室的信息
+        R<StudyRoom> studyRoomMessage = studyRoomClient.getStudyRoomMessage(studyRoomId);
+        StudyRoom data = studyRoomMessage.getData();
+        //添加
+        addStudyToElasticSearch(data);
+    }
+
+    /**
+     * 删除自习室
+     * @param studyRoomId
+     */
+    @RabbitListener(queues = "deleteStudyRoom")
+    public void deleteStudyRoom(String studyRoomId) throws IOException {
+        deleteStudyRoomFromElasticSearch(studyRoomId);
+    }
+
+
+    @RabbitListener(queues = "updateStudyRoom")
+    public void updateStudyRoom(String studyRoomId) throws IOException {
+        //去查询该自习室的信息
+        R<StudyRoom> studyRoomMessage = studyRoomClient.getStudyRoomMessage(studyRoomId);
+        StudyRoom data = studyRoomMessage.getData();
+        updateStudyRoomToElasticSearch(data);
+    }
 
 
 

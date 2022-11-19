@@ -11,6 +11,7 @@ import liveroomservice.Service.StudyRoomMemberService;
 import liveroomservice.Service.StudyRoomPlanService;
 import liveroomservice.Service.StudyRoomService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
@@ -35,6 +36,9 @@ public class StudyRoomController {
 
     @Autowired
     private UserClient userClient;
+
+    @Autowired
+    private RabbitTemplate rabbitTemplate;
 
     /**
      * 创建自习室
@@ -63,6 +67,10 @@ public class StudyRoomController {
         member.setUserName(studyRoom.getUserName());
         member.setMemberIdentify("房主");
         studyRoomMemberService.save(member);
+        //向队列中发送消息
+        String queue="addStudyRoom";
+        //发送消息
+        rabbitTemplate.convertAndSend(queue,studyRoom.getStudyRoomId().toString());
         //创建一个
         return R.success("自习室间创建成功");
     }
@@ -95,6 +103,9 @@ public class StudyRoomController {
         log.info(studyRoomId);
         //直接删除之
         studyRoomService.removeById(Long.parseLong(studyRoomId));
+        //定义队列
+        String queue="deleteStudyRoom";
+        rabbitTemplate.convertAndSend(queue,studyRoomId);
         return R.success("删除自习室成功");
     }
 
@@ -126,6 +137,8 @@ public class StudyRoomController {
     public R<String> updateStudyRoomMessage(@RequestBody StudyRoom studyRoom){
         //直接更新之
         studyRoomService.updateById(studyRoom);
+        String queue="updateStudyRoom";
+        rabbitTemplate.convertAndSend(queue,studyRoom.getStudyRoomId().toString());
         return R.success("修改自习室信息成功");
     }
 

@@ -27,21 +27,6 @@ public class User implements Serializable {
     private Boolean checked;//是否记住账号密码
     private List<String> suggestion;//自动补全字段
 
-    //以下为自动填充字段
-    //插入时填充
-    @TableField(fill = FieldFill.INSERT)
-    private LocalDateTime createTime;
-    //插入时填充
-    @TableField(fill = FieldFill.INSERT)
-    private Long createUser;//创建者的id
-    //插入合更新都填充
-    @TableField(fill = FieldFill.INSERT_UPDATE)
-    private LocalDateTime updateTime;
-    //插入合更新都填充
-    @TableField(fill = FieldFill.INSERT_UPDATE)
-    private Long updateUser;//修改人的id
 
-//    public User(){
-//
-//    }
+
 }

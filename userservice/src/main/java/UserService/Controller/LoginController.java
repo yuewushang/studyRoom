@@ -7,6 +7,7 @@ import UserService.Service.UserService;
 import UserService.Utills.JWTUtill;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
@@ -34,6 +35,9 @@ public class LoginController {
 
     @Autowired
     private RedisTemplate redisTemplate;
+
+    @Autowired
+    private RabbitTemplate rabbitTemplate;
 
     /**
      * 处理登录请求
@@ -112,6 +116,11 @@ public class LoginController {
         user.setUpdateUser(1L);
         //添加用户
         userService.save(user);
+        //向添加用户队列发送消息
+        //定义队列名
+        String queue="addUser";
+        //发送消息
+        rabbitTemplate.convertAndSend(queue,user.getUserId().toString());
         return R.success("注册成功");
     }
 
@@ -147,6 +156,17 @@ public class LoginController {
         String userId = request.getHeader("userId");
         User byId = userService.getById(Long.parseLong(userId));
         return R.success(byId);
+    }
+
+    /**
+     * 根据id获取用户信息
+     * @param userId
+     * @return
+     */
+    @GetMapping("/getUserMessageById")
+    public User getUserMessageById(String userId){
+        User byId = userService.getById(Long.parseLong(userId));
+        return byId;
     }
 
     @GetMapping("/hello")
