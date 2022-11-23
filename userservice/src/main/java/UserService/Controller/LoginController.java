@@ -3,9 +3,12 @@ package UserService.Controller;
 import UserService.Common.R;
 import UserService.Domain.StreamResult;
 import UserService.Domain.User;
+import UserService.Domain.UserPlan;
+import UserService.Service.UserPlanService;
 import UserService.Service.UserService;
 import UserService.Utills.JWTUtill;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,7 +22,12 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -38,6 +46,9 @@ public class LoginController {
 
     @Autowired
     private RabbitTemplate rabbitTemplate;
+
+    @Autowired
+    private UserPlanService userPlanService;
 
     /**
      * 处理登录请求
@@ -232,4 +243,56 @@ public class LoginController {
         }
         return list;
     }
+
+
+    /**
+     * 用户创建每日计划
+     * @param userPlan
+     * @return
+     */
+    @PostMapping("/createUserPlanForToday")
+    public R<String> createUserPlanForToday(@RequestBody UserPlan userPlan){
+        //直接创建
+        userPlanService.save(userPlan);
+        return R.success("用户计划创建成功");
+    }
+
+    @GetMapping("/getUserPlanForToday")
+    public R<List<UserPlan>> getUserPlanForToday(String userId){
+        //创建一个时间模板
+        SimpleDateFormat simpleDateFormat=new SimpleDateFormat("yyyy-MM-dd");//年月日
+        String format = simpleDateFormat.format(new Date());//获取当前时间的年月日
+        //构造查询条件
+        LambdaQueryWrapper<UserPlan>wrapper=new LambdaQueryWrapper<>();
+        wrapper.eq(userId!=null,UserPlan::getUserId,userId);
+        //根据创建时间升序排序
+        wrapper.orderByAsc(UserPlan::getCreateTime);
+        //查询
+        List<UserPlan> list = userPlanService.list(wrapper);
+        //遍历之，获取今天的学习计划
+        List<UserPlan> reusltList=new ArrayList<>();
+        for(int i=0;i<list.size();i++){
+            //获取创建时间
+            LocalDateTime createTime = list.get(i).getCreateTime();
+            //将LocalDateTime转换为年月日的形式
+            String format1 = createTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+            //如果是今天，则添加到结果集中
+            if(format.equals(format1)){
+                reusltList.add(list.get(i));
+            }
+        }
+        return R.success(reusltList);
+    }
+
+    /**
+     * 删除每日计划
+     * @param userPlan
+     * @return
+     */
+    @PutMapping("/deleteUserPlanForToday")
+    public R<String> deleteUserPlanForToday(@RequestBody UserPlan userPlan){
+        userPlanService.removeById(userPlan);
+        return R.success("计划删除成功");
+    }
+
 }

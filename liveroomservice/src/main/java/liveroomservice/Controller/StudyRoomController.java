@@ -11,6 +11,7 @@ import liveroomservice.Service.StudyRoomMemberService;
 import liveroomservice.Service.StudyRoomPlanService;
 import liveroomservice.Service.StudyRoomService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
@@ -461,6 +462,33 @@ public class StudyRoomController {
         List<String> fourDeskMate = userClient.getFourDeskMate(userIdList);
         return R.success(fourDeskMate);
 
+    }
+
+    /**
+     * 监听更新学习时长变化的消息
+     * @param message
+     */
+    @RabbitListener(queues = "updateLearnTime")
+    public void listenUpdateLearnTime(String message){
+        System.out.println(message);
+        System.out.println("最后一位"+message.charAt(message.length()-1));
+        Integer isFace=Integer.parseInt(String.valueOf(message.charAt(message.length()-1)));
+        String userName=message.substring(0,message.length()-1);
+        System.out.println("用户名"+userName);
+        //如果人还在，则isFace的值为1
+        if(isFace==1){
+            //搜素是否有该用户
+            LambdaQueryWrapper<StudyRoomMember> wrapper=new LambdaQueryWrapper<>();
+            wrapper.eq(userName!=null,StudyRoomMember::getUserName,userName);
+            wrapper.eq(StudyRoomMember::getIsOnline,1);
+            StudyRoomMember one = studyRoomMemberService.getOne(wrapper);
+            //增加学习时长
+            if(one!=null){
+                one.setLengthOfStudy(one.getLengthOfStudy()+0.0083);
+                studyRoomMemberService.update(one,wrapper);
+                log.info("更新"+userName+"的学习时长成功");
+            }
+        }
     }
 
 
