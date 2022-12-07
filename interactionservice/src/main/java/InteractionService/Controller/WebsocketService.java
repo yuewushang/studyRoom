@@ -76,10 +76,19 @@ public class WebsocketService {
      * @return
      */
     @OnClose
-    public void onClose(){
+    public void onClose() throws IOException {
         if(websocketServiceConcurrentHashMap.containsKey(userInformation)){
             websocketServiceConcurrentHashMap.remove(userInformation);
             this.subOnlineNumber(studyRoomId);
+        }
+        Iterator<Map.Entry<String, WebsocketService>> iterator = websocketServiceConcurrentHashMap.entrySet().iterator();
+        while (iterator.hasNext()){
+            Map.Entry<String, WebsocketService> next = iterator.next();
+            String key = next.getKey();
+            //如果是同一个直播间中的信息
+            if(userInformation.substring(0,19).equals(key.substring(0,19))){
+                next.getValue().sendMessage(JSON.toJSONString("当前在线人数为"+this.getOnlineNumber(studyRoomId)));
+            }
         }
         log.info("用户"+userInformation+"退出，当前在线人数为"+this.getOnlineNumber(studyRoomId));
     }
@@ -96,12 +105,14 @@ public class WebsocketService {
         String userName=object.get("userInformation").toString().substring(19);
         String studyRoomId2=object.get("userInformation").toString().substring(0,19);
         String messageToSend=object.getString("messageToSend");
+        String imageUrl=object.getString("imageUrl");
         //获取当前时间
         LocalDateTime time=LocalDateTime.now();
         JSONObject object1=new JSONObject();
         object1.put("userName",userName);
         object1.put("time",time);
         object1.put("message",messageToSend);
+        object1.put("imageUrl",imageUrl);
         //将数据存储到数据库中
         Message messageToStore=new Message();
         messageToStore.setCreateTime(time);

@@ -50,6 +50,9 @@ public class LoginController {
     @Autowired
     private UserPlanService userPlanService;
 
+    //手动负载俊豪
+    private static int recordNumber=0;
+
     /**
      * 处理登录请求
      *
@@ -192,13 +195,34 @@ public class LoginController {
      */
     @GetMapping("/getKeyAndWord")
     public R<StreamResult> getKeyAndWord(HttpServletRequest request) {
+        //srs服务器的ip地址
+        String ipAddress="43.139.123.157";
+        //端口号
+        String port="8080";
+        //获取记录数
+        int record=recordNumber;
+        //手动负载均衡
+        if(record<3){
+            if(record==1){
+                ipAddress="1.12.230.201:19351";
+                port="8081";
+            }
+            else if(record==2){
+                ipAddress="43.138.211.210:19351";
+                port="8081";
+            }
+        }else {
+            record=record%3;
+            recordNumber=recordNumber%3;
+        }
+        recordNumber++;
         String userId = request.getHeader("userId");
         //查询该用户的信息
         User byId = userService.getById(Long.parseLong(userId));
         //拼装返回地址
         String streamWord = byId.getStreamWord();
-        String pushUrl = "rtmp://175.178.85.36/live/" + userId;
-        String pullUrl = "http://175.178.85.36:8080/live/" + userId + "/" + streamWord + ".flv";
+        String pushUrl = "rtmp://"+ipAddress+"/" + userId;
+//        String pullUrl = "http://"+ipAddress+":"+port+"/" + userId + "/" + streamWord + ".flv";
         StreamResult streamResult = new StreamResult();
         streamResult.setKey(streamWord);
         streamResult.setPushUrl(pushUrl);
@@ -214,7 +238,7 @@ public class LoginController {
     public R<String> getPullUrl(String masterId) {
         User byId = userService.getById(Long.parseLong(masterId));
         String streamWord = byId.getStreamWord();
-        String pullUrl = "http://175.178.85.36:8080/live/" + masterId + "/" + streamWord + ".flv";
+        String pullUrl = "http://43.139.123.157:8080/" + masterId + "/" + streamWord + ".flv";
         return R.success(pullUrl);
     }
 
@@ -234,11 +258,32 @@ public class LoginController {
      */
     @PostMapping("/getFourDeskMate")
     public List<String>getFourDeskMate(@RequestBody List<Long> userList){
+        //srs服务器的ip地址
+        String ipAddress="43.139.123.157";
+        //端口号
+        String port="8080";
+        //获取记录数
+        int record=recordNumber;
+        //手动负载均衡
+        if(record<3){
+            if(record==1){
+                ipAddress="1.12.230.201";
+                port="8081";
+            }
+            else if(record==2){
+                ipAddress="43.138.211.210";
+                port="8081";
+            }
+        }else {
+            record=record%3;
+            recordNumber=recordNumber%3;
+        }
+        recordNumber++;
         List<String>list=new ArrayList<>();
         for(int i=0;i<userList.size();i++){
             User byId = userService.getById(userList.get(i));
             String streamWord = byId.getStreamWord();
-            String pullUrl = "http://175.178.85.36:8080/live/" + byId.getUserId() + "/" + streamWord + ".flv";
+            String pullUrl = "http://"+ipAddress+":"+port+"/" + byId.getUserId() + "/" + streamWord + ".flv";
             list.add(pullUrl);
         }
         return list;

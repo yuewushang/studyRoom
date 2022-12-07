@@ -2,6 +2,7 @@ package liveroomservice.Controller;
 
 import com.alibaba.fastjson.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import liveroomservice.Client.UserClient;
 import liveroomservice.Common.R;
 import liveroomservice.Domain.*;
@@ -17,6 +18,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
+import javax.servlet.http.HttpServletRequest;
 import javax.websocket.server.PathParam;
 import java.util.ArrayList;
 import java.util.List;
@@ -62,7 +64,7 @@ public class StudyRoomController {
         studyRoomService.save(studyRoom);
         //在创建直播间成功后，添加第一个成员
         StudyRoomMember member=new StudyRoomMember();
-        member.setIsOnline(0);
+        member.setIsOnline(1);
         member.setStudyRoomId(studyRoom.getStudyRoomId());
         member.setUserId(studyRoom.getUserId());
         member.setUserName(studyRoom.getUserName());
@@ -95,6 +97,71 @@ public class StudyRoomController {
     }
 
     /**
+     * 获取用户加入的所有自习室（自己创建的不算）
+     * @param userId
+     * @return
+     */
+    @GetMapping("/getAllStudyRoomJoinedByUser")
+    public R<List<StudyRoom>> getAllStudyRoomJoinedByUser(String userId){
+        //构造查询条件
+        LambdaQueryWrapper<StudyRoomMember> wrapper=new LambdaQueryWrapper<>();
+        //该用户加入的
+        wrapper.eq(userId!=null,StudyRoomMember::getUserId,Long.parseLong(userId));
+        //身份不为房主
+        wrapper.ne(StudyRoomMember::getMemberIdentify,"房主");
+        //安装创建日期升序排序
+        wrapper.orderByAsc(StudyRoomMember::getCreateTime);
+        //查询
+        List<StudyRoomMember> list = studyRoomMemberService.list(wrapper);
+        //存储结果
+        List<StudyRoom> studyRoomList=new ArrayList<>();
+        //获取房间号，重新封装结果
+        for(int i=0;i<list.size();i++){
+            Long studyRoomId = list.get(i).getStudyRoomId();
+            //根据房间号去查询房间
+            StudyRoom byId = studyRoomService.getById(studyRoomId);
+            //封装到结果集中
+            if(byId!=null){
+                studyRoomList.add(byId);
+            }
+        }
+        //返回查询结果
+        return R.success(studyRoomList);
+    }
+
+    /**
+     * 获取用户所在的所有的自习室的信息
+     * @param userId
+     * @return
+     */
+    @GetMapping("/getAllStudyRoomWhichUserIn")
+    public R<List<StudyRoom>> getAllStudyRoomWhichUserIn(String userId){
+        //构造查询条件
+        LambdaQueryWrapper<StudyRoomMember> wrapper=new LambdaQueryWrapper<>();
+        //该用户加入的
+        wrapper.eq(userId!=null,StudyRoomMember::getUserId,Long.parseLong(userId));
+        //安装学习时长降序排序
+        wrapper.orderByDesc(StudyRoomMember::getLengthOfStudy);
+        //查询
+        List<StudyRoomMember> list = studyRoomMemberService.list(wrapper);
+        //存储结果
+        List<StudyRoom> studyRoomList=new ArrayList<>();
+        //获取房间号，重新封装结果
+        for(int i=0;i<list.size();i++){
+            Long studyRoomId = list.get(i).getStudyRoomId();
+            //根据房间号去查询房间
+            StudyRoom byId = studyRoomService.getById(studyRoomId);
+            //封装到结果集中
+            if(byId!=null){
+                studyRoomList.add(byId);
+            }
+        }
+        //返回查询结果
+        return R.success(studyRoomList);
+    }
+
+
+    /**
      * 更具自习室的id去删除自习室
      * @param studyRoomId
      * @return
@@ -125,6 +192,7 @@ public class StudyRoomController {
             return R.error("该自习室不存在");
         }
         //如果一切正常返回直播间信息
+        one.setStudyRoomPassword("****");
         return R.success(one);
     }
 
@@ -254,7 +322,7 @@ public class StudyRoomController {
         StudyRoomMember one = studyRoomMemberService.getOne(wrapper);
         //如果不为空，则已经是该自习室的成员了
         if(one!=null){
-            return R.success("你已经是该自习室的成员了，请勿重复加入");
+            return R.error("你已经是该自习室的成员了，请勿重复加入");
         }
         //如果还不是成员，则加入之
         studyRoomMemberService.save(verify);
@@ -359,15 +427,37 @@ public class StudyRoomController {
      * @return
      */
     @GetMapping("/shareStudyRoom")
-    public R<ShareStudyRoom> shareStudyRoom(String studyRoomId){
+    public R<ShareStudyRoom> shareStudyRoom(String studyRoomId, HttpServletRequest request){
+        String userId = request.getHeader("userId");
         //查询该自习室的信息
         StudyRoom byId = studyRoomService.getById(Long.parseLong(studyRoomId));
-        //封装结果
         ShareStudyRoom shareStudyRoom=new ShareStudyRoom();
         shareStudyRoom.setStudyRoomIntroduction(byId.getStudyRoomIntroduction());
         shareStudyRoom.setStudyRoomName(byId.getStudyRoomName());
-        shareStudyRoom.setStudyRoomPassword(byId.getStudyRoomPassword());
-        return R.success(shareStudyRoom);
+        shareStudyRoom.setStudyRoomType(byId.getStudyRoomType());
+        shareStudyRoom.setStudyRoomPassword("无需密码");
+        //如果这是公共自习室
+        if(byId.getStudyRoomType().equals("公共自习室")){
+            //封装结果
+            return R.success(shareStudyRoom);
+        }
+        else {
+            //查询该用户是否是房间成员
+            LambdaQueryWrapper<StudyRoomMember>wrapper=new LambdaQueryWrapper<>();
+            wrapper.eq(StudyRoomMember::getUserId,userId);
+            wrapper.eq(StudyRoomMember::getStudyRoomId,studyRoomId);
+            StudyRoomMember one = studyRoomMemberService.getOne(wrapper);
+            //如果是该自习室的成员
+            if(one!=null){
+                shareStudyRoom.setStudyRoomPassword(byId.getStudyRoomPassword());
+                return R.success(shareStudyRoom);
+            }
+            //如果不是该自习室的成员，直接返回
+            else {
+                shareStudyRoom.setStudyRoomPassword("");
+                return R.success(shareStudyRoom);
+            }
+        }
     }
 
     /**
@@ -406,6 +496,16 @@ public class StudyRoomController {
         List<StudyRoomMember> list = studyRoomMemberService.list(wrapper);
         //记录符合条件的用户id
         List<Long>userIdList=new ArrayList<>();
+
+        //判断该用户是否是自习室的成员
+        LambdaQueryWrapper<StudyRoomMember>wrapper2=new LambdaQueryWrapper<>();
+        wrapper2.eq(userId!=null,StudyRoomMember::getUserId,Long.parseLong(userId));
+        wrapper2.eq(StudyRoomMember::getStudyRoomId,l);
+        //查询
+        StudyRoomMember one2 = studyRoomMemberService.getOne(wrapper2);
+        //如果是该自习室的成员
+        if(one2!=null){
+
         //如果在线的成员数少于4人，
         if(list.size()<=4){
             //调用userService服务，获取这几个人的拉流地址
@@ -462,6 +562,32 @@ public class StudyRoomController {
         List<String> fourDeskMate = userClient.getFourDeskMate(userIdList);
         return R.success(fourDeskMate);
 
+        }
+        //如果该用户不是该自习室的成员
+        else {
+            //如果在线的成员数少于4人，
+            if(list.size()<=4){
+                //调用userService服务，获取这几个人的拉流地址
+                //获取用户id
+                for(int i=0;i<list.size();i++){
+                    userIdList.add(list.get(i).getUserId());
+                }
+                //发送服务调用请求
+                List<String> fourDeskMate = userClient.getFourDeskMate(userIdList);
+                return R.success(fourDeskMate);
+
+            }
+            else {
+                for(int i=0;i<4;i++){
+                    userIdList.add(list.get(i).getUserId());
+                }
+                //发送服务调用请求
+                List<String> fourDeskMate = userClient.getFourDeskMate(userIdList);
+                return R.success(fourDeskMate);
+            }
+
+        }
+
     }
 
     /**
@@ -489,6 +615,55 @@ public class StudyRoomController {
                 log.info("更新"+userName+"的学习时长成功");
             }
         }
+    }
+
+    /**
+     * 获取受欢迎的自习室
+     * @return
+     */
+    @GetMapping("/getPopularStudyRoom")
+    public R<Page> getPopularStudyRoom(Integer pageNumber,Integer pageSize){
+        //构造分页器，装填页数和页面大小
+        Page page=new Page(pageNumber,pageSize);
+        //构造查询条件
+        LambdaQueryWrapper<StudyRoom> wrapper=new LambdaQueryWrapper<>();
+        wrapper.orderByDesc(StudyRoom::getStudyRoomMemberNumber);
+        studyRoomService.page(page,wrapper);
+        //对密码进行加密处理
+        List records = page.getRecords();
+        for(int i=0;i<records.size();i++){
+            StudyRoom studyRoom = (StudyRoom) records.get(i);
+            studyRoom.setStudyRoomPassword("****");
+            records.set(i,studyRoom);
+        }
+        page.setRecords(records);
+        //返回结果
+        return R.success(page);
+    }
+
+    /**
+     * 根据自习室创建时间前后，获取所有自习室
+     * @return
+     */
+    @GetMapping("/getAllStudyRoomCreated")
+    public R<Page<StudyRoom>>getAllStudyRoomCreated(Integer pageNumber,Integer pageSize){
+        //创建分页器
+        Page<StudyRoom>page=new Page<>(pageNumber,pageSize);
+        //创建筛选条件
+        LambdaQueryWrapper<StudyRoom> wrapper=new LambdaQueryWrapper<>();
+        wrapper.orderByAsc(StudyRoom::getCreateTime);
+        //获取
+        studyRoomService.page(page,wrapper);
+        //对密码进行加密处理
+        List records = page.getRecords();
+        for(int i=0;i<records.size();i++){
+            StudyRoom studyRoom = (StudyRoom) records.get(i);
+            studyRoom.setStudyRoomPassword("****");
+            records.set(i,studyRoom);
+        }
+        page.setRecords(records);
+        //返回数据
+        return R.success(page);
     }
 
 
