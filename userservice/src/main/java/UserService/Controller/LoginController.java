@@ -4,6 +4,8 @@ import UserService.Common.R;
 import UserService.Domain.StreamResult;
 import UserService.Domain.User;
 import UserService.Domain.UserPlan;
+import UserService.Dto.RegisterDto;
+import UserService.Service.SendMailService;
 import UserService.Service.UserPlanService;
 import UserService.Service.UserService;
 import UserService.Utills.JWTUtill;
@@ -17,12 +19,13 @@ import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.util.DigestUtils;
 import org.springframework.web.bind.annotation.*;
 
+import javax.mail.MessagingException;
 import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpSession;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
-import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -49,6 +52,9 @@ public class LoginController {
 
     @Autowired
     private UserPlanService userPlanService;
+
+    @Autowired
+    private SendMailService sendMailService;
 
     //手动负载俊豪
     private static int recordNumber=0;
@@ -101,6 +107,30 @@ public class LoginController {
         return R.success(token);
     }
 
+
+    /**
+     * 通过qq邮箱发送验证码
+     * @param qqMail
+     * @param request
+     * @return
+     */
+    @GetMapping("/sendIdentifyCode")
+    public R<String>sendIdentifyCode(String qqMail,HttpServletRequest request) throws UnsupportedEncodingException, MessagingException {
+        //发送邮件
+        if(qqMail.equals("")||qqMail==null){
+            return R.error("请您填写正确的qq邮件");
+        }
+        String s = sendMailService.SendMail(qqMail);
+        //获取session
+        HttpSession session = request.getSession();
+        //往session中添加验证码数据和时间
+        session.setAttribute("identifyCode",s);
+        //设置验证码更新时间，毫秒级
+        session.setAttribute("identifyCodeTime",System.currentTimeMillis());
+        log.info(qqMail+" 的验证码为: "+s);
+        return R.success("验证码发送成功");
+    }
+
     /**
      * 处理注册请求
      *
@@ -108,7 +138,7 @@ public class LoginController {
      * @return
      */
     @PostMapping("/register")
-    public R<String> register(@RequestBody User user) {
+    public R<String> register(@RequestBody RegisterDto user,HttpServletRequest request) {
         //查询数据库，看该用户是否存在
         LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(user.getUserName() != null, User::getUserName, user.getUserName());
@@ -118,6 +148,18 @@ public class LoginController {
         if (one != null) {
             return R.error("该用户已经存在");
         }
+        //获取验证码
+        String identifyCode = (String) request.getSession().getAttribute("identifyCode");
+        System.out.println("1"+identifyCode);
+        long identifyCodeTime = (long) request.getSession().getAttribute("identifyCodeTime");
+        log.info(identifyCode+"时间"+identifyCodeTime);
+        //获取当前系统时间，毫秒级
+        long l = System.currentTimeMillis();
+        //若验证码错误，或者已经过期(超过5分钟)
+        if(!user.getIdentifyCode().equals(identifyCode)||(l-identifyCodeTime)>=1000*60*5){
+            return R.error("验证码错误，或者已经过期,请重新发送验证码");
+        }
+        System.out.println("?");
         //对密码进行加密处理
         String password = user.getPassword();
         password = DigestUtils.md5DigestAsHex(password.getBytes());

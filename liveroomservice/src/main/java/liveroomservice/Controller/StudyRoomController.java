@@ -11,6 +11,7 @@ import liveroomservice.Dto.ShareStudyRoom;
 import liveroomservice.Service.StudyRoomMemberService;
 import liveroomservice.Service.StudyRoomPlanService;
 import liveroomservice.Service.StudyRoomService;
+import liveroomservice.Service.StudyRoomTargetService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -20,6 +21,8 @@ import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.websocket.server.PathParam;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -36,6 +39,9 @@ public class StudyRoomController {
 
     @Autowired
     private StudyRoomMemberService studyRoomMemberService;
+
+    @Autowired
+    private StudyRoomTargetService studyRoomTargetService;
 
     @Autowired
     private UserClient userClient;
@@ -171,6 +177,10 @@ public class StudyRoomController {
         log.info(studyRoomId);
         //直接删除之
         studyRoomService.removeById(Long.parseLong(studyRoomId));
+        //删除自习室中的成员信息
+        LambdaQueryWrapper<StudyRoomMember>wrapper=new LambdaQueryWrapper<>();
+        wrapper.eq(StudyRoomMember::getStudyRoomId,studyRoomId);
+        studyRoomMemberService.remove(wrapper);
         //定义队列
         String queue="deleteStudyRoom";
         rabbitTemplate.convertAndSend(queue,studyRoomId);
@@ -228,6 +238,9 @@ public class StudyRoomController {
             return R.error("该自习室不存在");
         }
         //如果一切正常，去创建一个自习室的计划
+        //获取当前时间
+        LocalDateTime now = LocalDateTime.now();
+        studyRoomPlan.setCreatePlanTime(now);
         studyRoomPlanService.save(studyRoomPlan);
         return R.success("自习室计划添加成功");
     }
@@ -239,12 +252,43 @@ public class StudyRoomController {
      * @return
      */
     @GetMapping("/getStudyRoomPlan")
-    public R<List<StudyRoomPlan>> getStudyRoomPlan(String studyRoomId){
+    public R<List<StudyRoomPlan>> getStudyRoomPlan(String studyRoomId,String userId){
+        //获取当前的年月日
+        LocalDateTime time=LocalDateTime.now();
+        String format = time.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
         LambdaQueryWrapper<StudyRoomPlan>wrapper=new LambdaQueryWrapper<>();
         wrapper.eq(studyRoomId!=null,StudyRoomPlan::getStudyRoomId,Long.parseLong(studyRoomId));
+        wrapper.eq(userId!=null,StudyRoomPlan::getUserId,userId);
         //查询
         List<StudyRoomPlan> list = studyRoomPlanService.list(wrapper);
+        //重新封装数据
+        List<StudyRoomPlan> resultList=new ArrayList<>();
+        for(int i=0;i<list.size();i++){
+            //获取年月日
+            StudyRoomPlan tem= list.get(i);
+            String format1 = tem.getCreatePlanTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+            if(format.equals(format1)){
+                resultList.add(tem);
+            }
+        }
         //返回数据
+        return R.success(resultList);
+    }
+
+    /**
+     * 获取该用户创建的所有计划
+     * @param userId
+     * @return
+     */
+    @GetMapping("/getAllPlanMakeByUser")
+    public R<List<StudyRoomPlan>> getAllPlanMakeByUser(String userId){
+        //构造查询条件
+        LambdaQueryWrapper<StudyRoomPlan> wrapper=new LambdaQueryWrapper<>();
+        wrapper.eq(userId!=null,StudyRoomPlan::getUserId,Long.parseLong(userId));
+        //按照创建时间降序排序
+        wrapper.orderByDesc(StudyRoomPlan::getCreatePlanTime);
+        //查询
+        List<StudyRoomPlan> list = studyRoomPlanService.list(wrapper);
         return R.success(list);
     }
 
@@ -355,6 +399,24 @@ public class StudyRoomController {
 
         return R.success("退出该自习室成功");
     }
+
+    /**
+     * 离开自习室，更新用户状态为离线
+     * @param member
+     */
+    @PutMapping("/exitStudyRoom")
+    public void exitStudyRoom(@RequestBody StudyRoomMember member){
+        //设置状态为离线
+        member.setIsOnline(0);
+        //构造查询条件
+        LambdaQueryWrapper<StudyRoomMember> wrapper=new LambdaQueryWrapper<>();
+        wrapper.eq(StudyRoomMember::getStudyRoomId,member.getStudyRoomId());
+        wrapper.eq(StudyRoomMember::getUserId,member.getUserId());
+        studyRoomMemberService.update(member,wrapper);
+        log.info("用户"+member.getUserId()+"已离线");
+    }
+
+
 
 
     /**
@@ -665,6 +727,69 @@ public class StudyRoomController {
         //返回数据
         return R.success(page);
     }
+
+
+    /**
+     * 添加自习室计划的函数
+     * @param studyRoomTarget
+     * @return
+     */
+    @PostMapping("/createStudyRoomTarget")
+    public R<String> createStudyRoomTarget(@RequestBody StudyRoomTarget studyRoomTarget){
+        //构造查询条件，看是否已经存在该计划
+        LambdaQueryWrapper<StudyRoomTarget> wrapper=new LambdaQueryWrapper<>();
+        wrapper.eq(studyRoomTarget.getStudyRoomId()!=null,StudyRoomTarget::getStudyRoomId,studyRoomTarget.getStudyRoomId());
+        wrapper.eq(studyRoomTarget.getUserId()!=null,StudyRoomTarget::getUserId,studyRoomTarget.getUserId());
+        wrapper.eq(studyRoomTarget.getTitle()!=null,StudyRoomTarget::getTitle,studyRoomTarget.getTitle());
+        //查询
+        StudyRoomTarget one = studyRoomTargetService.getOne(wrapper);
+        //如果该计划已经存在，则不运行创建
+        if(one!=null){
+            return R.error("该计划已经存在，请删除后重新创建");
+        }
+        else {
+            //创建该计划
+            studyRoomTargetService.save(studyRoomTarget);
+            return R.success("创建计划成功!");
+        }
+    }
+
+    /**
+     * 删除目标
+     * @param targetId
+     * @return
+     */
+    @DeleteMapping("/deleteStudyRoomTarget/{targetId}")
+    public R<String> deleteStudyRoomTarget(@PathVariable String targetId){
+        //检查该目标是否存在
+        StudyRoomTarget byId = studyRoomTargetService.getById(Long.parseLong(targetId));
+        //若该目标不存在，返回错误信息
+        if(byId==null){
+            return R.error("该目标不存在");
+        }
+        else {
+            //删除该目标
+            studyRoomTargetService.removeById(Long.parseLong(targetId));
+            return R.success("删除目标成功");
+        }
+    }
+
+    /**
+     * 获取该用户创建的所有自习室
+     * @param studyRoomId
+     * @param userId
+     * @return
+     */
+    @GetMapping("/getAllStudyRoomTargetThatCreated")
+    public R<List<StudyRoomTarget>> getAllStudyRoomTargetThatCreated(String studyRoomId,String userId){
+        //构造查询条件
+        LambdaQueryWrapper<StudyRoomTarget> wrapper=new LambdaQueryWrapper<>();
+        wrapper.eq(studyRoomId!=null,StudyRoomTarget::getStudyRoomId,Long.parseLong(studyRoomId));
+        wrapper.eq(userId!=null,StudyRoomTarget::getUserId,Long.parseLong(userId));
+        List<StudyRoomTarget> list = studyRoomTargetService.list(wrapper);
+        return R.success(list);
+    }
+
 
 
 

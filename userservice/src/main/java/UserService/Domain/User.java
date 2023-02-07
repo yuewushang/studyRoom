@@ -22,6 +22,7 @@ public class User implements Serializable {
     private String status;//用户的身份
     private String imageUrl;//用户的头像的名称
     private Boolean checked;//是否记住账号密码
+    private String qqMail;//qq邮箱
     //以下为自动填充字段
     //插入时填充
     @TableField(fill = FieldFill.INSERT)

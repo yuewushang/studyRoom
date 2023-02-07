@@ -6,11 +6,15 @@ spring:
   cloud:
     nacos:
       server-addr: localhost:8848 #nacos服务发现地址
+      discovery:
+#        ip: 175.178.85.36
+        ip: localhost
+        port: 8085
   datasource:
     druid:
       url: jdbc:mysql://175.178.85.36:3306/zhibo
       username: root
-      password: root
+      password: hjc123
       driver-class-name: com.mysql.cj.jdbc.Driver
 #配置redis
   redis:
