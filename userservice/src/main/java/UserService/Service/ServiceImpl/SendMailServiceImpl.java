@@ -67,4 +67,29 @@ public class SendMailServiceImpl implements SendMailService {
         //发送邮件
         javaMailSender.send(mimeMessage);
     }
+
+    /**
+     * 提醒签到邮件
+     * @param qq
+     * @param name
+     * @throws MessagingException
+     * @throws UnsupportedEncodingException
+     */
+    @Override
+    public void SendRemindQianDaoMail(String qq, String name) throws MessagingException, UnsupportedEncodingException {
+        //创建一个邮件
+        MimeMessage mimeMessage = javaMailSender.createMimeMessage();
+        //创建邮件修饰器
+        MimeMessageHelper helper=new MimeMessageHelper(mimeMessage,true);
+        //设置发送人邮箱，和名称
+        helper.setFrom("2669287863@qq.com","寒窗自习室");
+        //设置收件人地址
+        helper.setTo(qq);
+        //设置邮件主题
+        helper.setSubject("每日提醒服务");
+        //设置邮件内容
+        helper.setText("亲爱的： "+name+" ，晚上好呀~，今天没有看见你，有点小失望0.0，明天记得来签到哦~。 -----寒窗自习室");
+        //发送邮件
+        javaMailSender.send(mimeMessage);
+    }
 }

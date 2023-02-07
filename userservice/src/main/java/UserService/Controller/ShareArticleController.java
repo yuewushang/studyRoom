@@ -1,16 +1,20 @@
 package UserService.Controller;
 
 import UserService.Common.R;
+import UserService.Domain.ArticleComment;
 import UserService.Domain.ShareArticle;
 import UserService.Domain.UserFriends;
 import UserService.Dto.LikesDto;
+import UserService.Service.ArticleCommentService;
 import UserService.Service.RedisService;
 import UserService.Service.ShareArticleService;
 import UserService.Service.UserFriendsService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
+
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -20,6 +24,7 @@ import java.util.Map;
 //Restfull风格的controller
 @RestController
 @RequestMapping("/user/shareArticle")
+@Slf4j
 public class ShareArticleController {
 
     @Autowired
@@ -30,6 +35,9 @@ public class ShareArticleController {
 
     @Autowired
     private RedisService redisService;
+
+    @Autowired
+    private ArticleCommentService articleCommentService;
 
 
     /**
@@ -87,8 +95,14 @@ public class ShareArticleController {
      * @return
      */
     @DeleteMapping("/deleteShareArticle")
+    //开启事务
+    @Transactional
     public R<String> deleteShareArticle(@RequestBody ShareArticle shareArticle){
         shareArticleService.removeById(shareArticle);
+        Long articleId = shareArticle.getArticleId();
+        LambdaQueryWrapper<ArticleComment>wrapper=new LambdaQueryWrapper<>();
+        wrapper.eq(ArticleComment::getArticleId,articleId);
+        articleCommentService.remove(wrapper);
         return R.success("动态删除成功");
     }
 
@@ -115,6 +129,31 @@ public class ShareArticleController {
     public R<List<String>> getAllLikes(){
         R<List<String>> allLikes = redisService.getAllLikes();
         return allLikes;
+    }
+
+
+    /**
+     * 添加文章评论
+     * @param articleComment
+     * @return
+     */
+    @PostMapping("/addPinglun")
+    public R<String>addPinglun(@RequestBody ArticleComment articleComment){
+        articleCommentService.save(articleComment);
+        log.info("添加评论: "+articleComment);
+        return R.success("评论成功");
+    }
+
+    /**
+     * 获取所有评论
+     * @return
+     */
+    @GetMapping("/getAllPingluns")
+    public R<List<ArticleComment>>getAllPingluns(){
+        LambdaQueryWrapper<ArticleComment>wrapper=new LambdaQueryWrapper<>();
+        wrapper.orderByAsc(ArticleComment::getCreateTime);
+        List<ArticleComment> list = articleCommentService.list(wrapper);
+        return R.success(list);
     }
 
 
