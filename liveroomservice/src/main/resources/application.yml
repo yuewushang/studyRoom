@@ -15,11 +15,11 @@ spring:
       username: root
       password: hjc123
       driver-class-name: com.mysql.cj.jdbc.Driver
-      url: jdbc:mysql://175.178.85.36:3306/zhibo
+      url: jdbc:mysql://localhost:3306/zhibo
   #配置redis
   redis:
     database: 0 #使用0号数据库
-    host: 175.178.85.36
+    host: localhost
     port: 6379
     jedis:
       pool:
@@ -29,7 +29,7 @@ spring:
         max-wait: 1ms #数据库最大阻塞时间
   #配置rabbitmq
   rabbitmq:
-    addresses: 121.37.24.27
+    addresses: localhost
     username: yue
     password: yue
     virtual-host: /
